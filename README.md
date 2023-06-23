@@ -1,1 +1,1 @@
-# labyrinth-generator
+# maze-generator
