@@ -2,14 +2,14 @@ use nannou::prelude::*;
 use nannou::rand::rngs::StdRng;
 use nannou::rand::{Rng, SeedableRng};
 
-const NUM_OF_ROWS: usize = 21;
-const NUM_OF_COLS: usize = 21;
+const NUM_OF_ROWS: usize = 5;
+const NUM_OF_COLS: usize = 5;
 
 fn main() {
     nannou::app(init).run();
 }
 
-#[derive(Default, Clone, Debug, Copy)]
+#[derive(Default, Clone, Debug, Copy, PartialEq)]
 struct GridCoordinates {
     x: usize,
     y: usize,
@@ -23,24 +23,20 @@ enum Direction {
     Right,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 struct Neighbor {
     cell: Option<Cell>,
     dir: Direction,
 }
 
+#[derive(Debug)]
 struct Player {
-    position: Point2,
     grid_coordinates: GridCoordinates,
 }
 
 struct CamelWarrior {
-    position: Point2,
     grid_coordinates: GridCoordinates,
 }
-
-// Stack
-// Dict for finalized cells
 
 #[derive(Default, Clone, Debug, Copy)]
 struct Cell {
@@ -53,27 +49,64 @@ struct Cell {
     grid_coordinates: GridCoordinates,
 }
 
-impl Cell {
-    fn connect_to_neighbors(&mut self, neighbors: Vec<Neighbor>) {
-        neighbors
-            .into_iter()
-            .for_each(|neighbor| match neighbor.dir {
-                Direction::Up => self.t_wall = false,
-                Direction::Down => self.b_wall = false,
-                Direction::Left => self.l_wall = false,
-                Direction::Right => self.r_wall = false,
-            });
-        self.in_maze = true;
+struct Model {
+    grid: Grid,
+    player: Player,
+    camel_warrior: CamelWarrior,
+    exit: GridCoordinates,
+}
+
+struct Grid {
+    cells: Vec<Vec<Cell>>,
+}
+
+impl Grid {
+    pub fn connect_neighbors(&mut self, cell_coords: GridCoordinates, directions: Vec<Direction>) {
+        directions.into_iter().for_each(|direction| {
+            match direction {
+                Direction::Up => {
+                    self.cells[cell_coords.x][cell_coords.y].t_wall = false;
+                    self.cells[cell_coords.x as usize][(cell_coords.y + 1) as usize].b_wall = false;
+                    self.cells[cell_coords.x as usize][(cell_coords.y + 1) as usize].in_maze = true;
+                }
+                Direction::Down => {
+                    self.cells[cell_coords.x][cell_coords.y].b_wall = false;
+                    self.cells[cell_coords.x as usize][(cell_coords.y - 1) as usize].t_wall = false;
+                    self.cells[cell_coords.x as usize][(cell_coords.y - 1) as usize].in_maze = true;
+                }
+                Direction::Left => {
+                    self.cells[cell_coords.x][cell_coords.y].l_wall = false;
+                    self.cells[(cell_coords.x - 1) as usize][cell_coords.y as usize].r_wall = false;
+                    self.cells[(cell_coords.x - 1) as usize][cell_coords.y as usize].in_maze = true;
+                }
+                Direction::Right => {
+                    self.cells[cell_coords.x][cell_coords.y].r_wall = false;
+                    self.cells[(cell_coords.x + 1) as usize][cell_coords.y as usize].l_wall = false;
+                    self.cells[(cell_coords.x + 1) as usize][cell_coords.y as usize].in_maze = true;
+                }
+            }
+            // neighbor_cell.in_maze = true;
+        });
+
+        let mut cell = &mut self.cells[cell_coords.x][cell_coords.y];
+        cell.in_maze = true;
+        cell.finalized = true;
+    }
+
+    pub fn check_for_wall(&mut self, cell_coords: GridCoordinates, direction: Key) -> bool {
+        match direction {
+            Key::Up => self.cells[cell_coords.x][cell_coords.y].t_wall,
+            Key::Down => self.cells[cell_coords.x][cell_coords.y].b_wall,
+            Key::Left => self.cells[cell_coords.x][cell_coords.y].l_wall,
+            Key::Right => self.cells[cell_coords.x][cell_coords.y].r_wall,
+            _ => false,
+        }
     }
 }
 
-struct Model {
-    grid: Vec<Vec<Cell>>,
-    player: Player,
-    camel_warrior: CamelWarrior,
-}
-
 fn init(app: &App) -> Model {
+    assert_eq!(NUM_OF_COLS, NUM_OF_COLS);
+
     let _window = app
         .new_window()
         .size(1200, 900)
@@ -83,177 +116,216 @@ fn init(app: &App) -> Model {
         .build()
         .unwrap();
 
+    let mut rng = StdRng::from_entropy();
+
+    // Randomly select the starting coordinates for the player
+    let player_coords = GridCoordinates {
+        x: rng.gen_range(0..NUM_OF_COLS),
+        y: rng.gen_range(0..NUM_OF_ROWS),
+    };
+    let cammel_warrior_coords = GridCoordinates {
+        x: rng.gen_range(0..NUM_OF_COLS),
+        y: rng.gen_range(0..NUM_OF_ROWS),
+    };
+
     let mut model = Model {
-        grid: vec![vec![Cell::default(); NUM_OF_ROWS]; NUM_OF_COLS],
+        grid: Grid {
+            cells: vec![vec![Cell::default(); NUM_OF_ROWS]; NUM_OF_COLS],
+        },
         player: Player {
-            position: (0.0, 0.0).into(),
-            grid_coordinates: GridCoordinates {
-                x: NUM_OF_COLS / 2,
-                y: NUM_OF_ROWS / 2,
-            },
+            grid_coordinates: player_coords,
         },
         camel_warrior: CamelWarrior {
-            position: (15.0, 15.0).into(),
-            grid_coordinates: GridCoordinates { x: 15, y: 15 },
+            grid_coordinates: cammel_warrior_coords,
+        },
+        exit: GridCoordinates {
+            x: rng.gen_range(0..NUM_OF_COLS),
+            y: rng.gen_range(0..NUM_OF_ROWS),
         },
     };
 
-    // Set grid coordinates for every cell
-    for y in 0..NUM_OF_COLS {
-        for x in 0..NUM_OF_ROWS {
-            model.grid[x][y].grid_coordinates.x = x;
-            model.grid[x][y].grid_coordinates.y = y;
-            model.grid[x][y].t_wall = false;
-            model.grid[x][y].b_wall = false;
-            model.grid[x][y].l_wall = false;
-            model.grid[x][y].r_wall = false;
-            model.grid[x][y].in_maze = false;
-            model.grid[x][y].finalized = false;
+    // Initialize every cell
+    for x in 0..NUM_OF_COLS {
+        for y in 0..NUM_OF_ROWS {
+            model.grid.cells[x][y].grid_coordinates.x = x;
+            model.grid.cells[x][y].grid_coordinates.y = y;
+            model.grid.cells[x][y].t_wall = true;
+            model.grid.cells[x][y].b_wall = true;
+            model.grid.cells[x][y].l_wall = true;
+            model.grid.cells[x][y].r_wall = true;
+            model.grid.cells[x][y].in_maze = false;
+            model.grid.cells[x][y].finalized = false;
         }
     }
 
-    let neighbors = get_neighbors(
-        model.grid.clone(),
-        model.grid[model.player.grid_coordinates.x as usize]
-            [model.player.grid_coordinates.y as usize],
-    );
+    // Get the starting cell
+    let starting_cell = model.grid.cells[model.player.grid_coordinates.x as usize]
+        [model.player.grid_coordinates.y as usize];
+
+    // Get the starting cell's neighbors and probabilstically connect it to them
+    let neighbors = get_neighbors(model.grid.cells.clone(), starting_cell);
     let connection_directions = directions_to_connect_to(neighbors);
 
-    // generate walls for the first cell
-    let GridCoordinates { x, y } = model.player.grid_coordinates;
-    model.grid[x as usize][y as usize].connect_to_neighbors(connection_directions);
-    model.grid[x as usize][y as usize].in_maze = true;
-    model.grid[x as usize][y as usize].finalized = true;
+    // Remove the walls in the direction of the connected neighbors
+    model
+        .grid
+        .connect_neighbors(model.player.grid_coordinates, connection_directions);
 
     model
 }
 
 fn key_pressed(app: &App, model: &mut Model, key: Key) {
-    let dir: Point2 = match key {
-        Key::Up => (0.0, 1.0),
-        Key::Down => (0.0, -1.0),
-        Key::Left => (-1.0, 0.0),
-        Key::Right => (1.0, 0.0),
-        _ => return,
+    // TODO: Add message and steps for when you are near the camel warrior.
+
+    // Move the player but only if there is not a wall in the direction its trying to move
+    if !model
+        .grid
+        .check_for_wall(model.player.grid_coordinates, key.into())
+    {
+        let movement_vec: (isize, isize) = match key {
+            Key::Up => (0, 1),
+            Key::Down => (0, -1),
+            Key::Left => (-1, 0),
+            Key::Right => (1, 0),
+            _ => return,
+        }
+        .into();
+
+        model.player.grid_coordinates.x =
+            (model.player.grid_coordinates.x as isize + movement_vec.0) as usize;
+        model.player.grid_coordinates.y =
+            (model.player.grid_coordinates.y as isize + movement_vec.1) as usize;
+
+        // Check if the player is now at the exit
+        if model.player.grid_coordinates == model.exit {
+            println!("🎉 YOU WON! 🎉");
+            app.quit();
+        }
+
+        let grid_copy = model.grid.cells.clone();
+
+        let cell = model.grid.cells[model.player.grid_coordinates.x as usize]
+            [model.player.grid_coordinates.y as usize];
+
+        if !cell.finalized {
+            let neighbors = get_neighbors(grid_copy, cell.clone());
+            let connection_directions = directions_to_connect_to(neighbors);
+
+            // generate walls for the first cell
+            model
+                .grid
+                .connect_neighbors(model.player.grid_coordinates, connection_directions);
+        }
+    } else {
+        // TODO: Play error sound.
+        println!("Can not move {:?}", key);
     }
-    .into();
-
-    // move the player in the Nannou coordinate system and in our maze's grid
-    // TODO: Account for being on the edge of the maze grid, we should't let the player move out of the maze boundaries.
-    model.player.position += dir;
-    model.player.grid_coordinates.x =
-        (model.player.grid_coordinates.x as isize + dir[0] as isize) as usize;
-    model.player.grid_coordinates.y =
-        (model.player.grid_coordinates.y as isize + dir[1] as isize) as usize;
-
-    let neighbors = get_neighbors(
-        model.grid.clone(),
-        model.grid[model.player.grid_coordinates.x as usize]
-            [model.player.grid_coordinates.y as usize],
-    );
-    let neighbors_to_connect_to = directions_to_connect_to(neighbors);
-
-    model.player.position;
-    // generate walls for the current cell
-    let GridCoordinates { x, y } = model.player.grid_coordinates;
-    model.grid[x as usize][y as usize].connect_to_neighbors(neighbors_to_connect_to);
-    model.grid[x as usize][y as usize].finalized = true;
 }
 
 fn view(app: &App, model: &Model, frame: Frame) {
     let win = app.window_rect();
+    let draw = app.draw();
+    draw.background().color(WHITE);
+
+    // Difference between Maze's grid origin [0;0] and Nannou's canvas origin (0,0) in pixels
+    let x_offset = -win.w() / 2.0;
+    let y_offset = -win.h() / 2.0;
 
     let cell_w = win.w() / NUM_OF_COLS as f32;
     let cell_h = win.h() / NUM_OF_ROWS as f32;
 
-    let draw = app.draw();
+    let draw_walls = |color: Srgb<u8>, cell_filter: &dyn Fn(Cell) -> bool| -> () {
+        for column in 0..NUM_OF_COLS {
+            for row in 0..NUM_OF_ROWS {
+                // for each wall, draw lines
+                let cell = model.grid.cells[column][row];
 
-    draw.background().color(WHITE);
+                let left_boundary_of_cell = cell.grid_coordinates.x as f32 * cell_w + x_offset;
+                let bottom_boundary_of_cell = cell.grid_coordinates.y as f32 * cell_h + y_offset;
 
-    // Draw the walls for each cell
-    for x in 0..NUM_OF_COLS {
-        for y in 0..NUM_OF_ROWS {
-            // for each wall, draw lines
-            let cell = model.grid[x][y];
+                if cell_filter(cell) {
+                    let mut point_pairs = vec![];
+                    if cell.t_wall {
+                        point_pairs.push((
+                            (left_boundary_of_cell, bottom_boundary_of_cell + cell_h),
+                            (
+                                left_boundary_of_cell + cell_w,
+                                bottom_boundary_of_cell + cell_h,
+                            ),
+                        ));
+                    }
+                    if cell.b_wall {
+                        point_pairs.push((
+                            (left_boundary_of_cell, bottom_boundary_of_cell),
+                            (left_boundary_of_cell + cell_w, bottom_boundary_of_cell),
+                        ));
+                    }
+                    if cell.l_wall {
+                        point_pairs.push((
+                            (left_boundary_of_cell, bottom_boundary_of_cell),
+                            (left_boundary_of_cell, bottom_boundary_of_cell + cell_h),
+                        ));
+                    }
+                    if cell.r_wall {
+                        point_pairs.push((
+                            (left_boundary_of_cell + cell_w, bottom_boundary_of_cell),
+                            (
+                                left_boundary_of_cell + cell_w,
+                                bottom_boundary_of_cell + cell_h,
+                            ),
+                        ));
+                    }
 
-            let left_boundary_of_cell = cell.grid_coordinates.x as f32 * cell_w;
-            let top_boundary_of_cell = cell.grid_coordinates.y as f32 * cell_h;
-
-            if cell.in_maze {
-                let mut point_pairs = vec![];
-                if cell.t_wall {
-                    point_pairs.push((
-                        (left_boundary_of_cell, top_boundary_of_cell),
-                        (left_boundary_of_cell + cell_w, top_boundary_of_cell),
-                    ));
-                }
-                if cell.b_wall {
-                    point_pairs.push((
-                        (left_boundary_of_cell, top_boundary_of_cell + cell_h),
-                        (
-                            left_boundary_of_cell + cell_w,
-                            top_boundary_of_cell + cell_h,
-                        ),
-                    ));
-                }
-                if cell.l_wall {
-                    point_pairs.push((
-                        (left_boundary_of_cell, top_boundary_of_cell),
-                        (left_boundary_of_cell, top_boundary_of_cell + cell_h),
-                    ));
-                }
-                if cell.r_wall {
-                    point_pairs.push((
-                        (left_boundary_of_cell + cell_w, top_boundary_of_cell),
-                        (
-                            left_boundary_of_cell + cell_w,
-                            top_boundary_of_cell + cell_h,
-                        ),
-                    ));
-                }
-
-                for ((sx, sy), (ex, ey)) in point_pairs {
-                    draw.line()
-                        .start((sx, sy).into())
-                        .end((ex, ey).into())
-                        .weight(1.0);
+                    for ((sx, sy), (ex, ey)) in point_pairs {
+                        draw.line()
+                            .color(color)
+                            .start((sx, sy).into())
+                            .end((ex, ey).into())
+                            .weight(1.0);
+                    }
                 }
             }
         }
-    }
+    };
 
-    // draw the player
-    let (x, y) = model.player.position.into();
+    // Draw the walls for every non-finalized cell in the maze, this is only for debugging
+    draw_walls(YELLOW, &|cell| !cell.finalized && cell.in_maze);
 
+    // Draw the maze walls
+    draw_walls(BLACK, &|cell| cell.finalized);
+
+    // START - Draw entities in the maze
+    let grid_coords_to_nannou_position = |coords: GridCoordinates| -> (f32, f32) {
+        let GridCoordinates { x, y } = coords;
+        (
+            (x as f32 + 0.5) * cell_w + x_offset,
+            (y as f32 + 0.5) * cell_h + y_offset,
+        )
+    };
+
+    // Draw the player
+    let player_position = grid_coords_to_nannou_position(model.player.grid_coordinates);
     draw.ellipse()
-        .x_y(x as f32 * cell_w, y as f32 * cell_h)
+        .x_y(player_position.0, player_position.1)
         .radius(10.0)
-        .no_fill()
-        .stroke(rgba(1.0, 0.0, 0.0, 1.0))
+        // .no_fill()
+        .stroke(BLACK)
         .stroke_weight(1.0);
+
+    // Draw the exit, for debug purposes only
+    let exit_position = grid_coords_to_nannou_position(model.exit);
+    draw.ellipse()
+        .x_y(exit_position.0, exit_position.1)
+        .radius(10.0)
+        .stroke(GREEN)
+        .stroke_weight(1.0);
+    // END - Draw entities in the maze
 
     // Write to the window frame.
     draw.to_frame(app, &frame).unwrap();
 }
 
 // fn mouse_pressed(_app: &App, model: &mut Model, _button: MouseButton) {}
-
-fn get_neighbor(grid: Vec<Vec<Cell>>, cell: Cell, dir: Direction) -> Cell {
-    match dir {
-        Direction::Up => {
-            grid[cell.grid_coordinates.x as usize][(cell.grid_coordinates.y + 1) as usize]
-        }
-        Direction::Down => {
-            grid[cell.grid_coordinates.x as usize][(cell.grid_coordinates.y - 1) as usize]
-        }
-        Direction::Left => {
-            grid[(cell.grid_coordinates.x - 1) as usize][cell.grid_coordinates.y as usize]
-        }
-        Direction::Right => {
-            grid[(cell.grid_coordinates.x + 1) as usize][cell.grid_coordinates.y as usize]
-        }
-    }
-}
 
 fn get_neighbors(grid: Vec<Vec<Cell>>, cell: Cell) -> Vec<Neighbor> {
     let mut neighbors = vec![];
@@ -297,33 +369,28 @@ fn get_neighbors(grid: Vec<Vec<Cell>>, cell: Cell) -> Vec<Neighbor> {
     return neighbors;
 }
 
-fn directions_to_connect_to(mut neighbors: Vec<Neighbor>) -> Vec<Neighbor> {
+fn directions_to_connect_to(mut neighbors: Vec<Neighbor>) -> Vec<Direction> {
     let mut rng = StdRng::from_entropy();
-    let mut neighbors_to_connect_to: Vec<Neighbor> = vec![];
+    let mut directions_to_connect_to: Vec<Direction> = vec![];
 
     // Randomly choose which neighbors to include
     for _i in 0..neighbors.len() {
         let neighbor = neighbors.pop().unwrap();
 
         // Check if the neighbor already has a wall there, if they do then don't connect to it.
-        if match neighbor.dir {
-            Direction::Up => !neighbor.cell.unwrap().b_wall,
-            Direction::Down => !neighbor.cell.unwrap().t_wall,
-            Direction::Left => !neighbor.cell.unwrap().r_wall,
-            Direction::Right => !neighbor.cell.unwrap().l_wall,
-        } && rng.gen_bool(0.5)
-        {
-            neighbors_to_connect_to.push(neighbor);
-        } else {
-            neighbors.insert(0, neighbor);
+        if !neighbor.cell.unwrap().finalized {
+            if rng.gen_bool(0.5) {
+                directions_to_connect_to.push(neighbor.dir);
+            } else {
+                neighbors.insert(0, neighbor);
+            }
         }
     }
 
-    // TODO: Account for edges where there are no neighbors
-
-    if neighbors_to_connect_to.len() == 0 {
-        neighbors_to_connect_to.push(neighbors[0]);
+    // Ensure that there is at least always one direction to connect to when possible
+    if directions_to_connect_to.len() == 0 && neighbors.len() != 0 {
+        directions_to_connect_to.push(neighbors[0].dir);
     }
 
-    return neighbors_to_connect_to;
+    return directions_to_connect_to;
 }
