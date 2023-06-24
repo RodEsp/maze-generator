@@ -2,8 +2,8 @@ use nannou::prelude::*;
 use nannou::rand::rngs::StdRng;
 use nannou::rand::{Rng, SeedableRng};
 
-const NUM_OF_ROWS: usize = 5;
-const NUM_OF_COLS: usize = 5;
+const NUM_OF_ROWS: usize = 20;
+const NUM_OF_COLS: usize = 20;
 
 fn main() {
     nannou::app(init).run();
@@ -109,7 +109,7 @@ fn init(app: &App) -> Model {
 
     let _window = app
         .new_window()
-        .size(1200, 900)
+        .size(900, 900)
         .view(view)
         // .mouse_pressed(mouse_pressed)
         .key_pressed(key_pressed)
@@ -288,8 +288,8 @@ fn view(app: &App, model: &Model, frame: Frame) {
         }
     };
 
-    // Draw the walls for every non-finalized cell in the maze, this is only for debugging
-    draw_walls(YELLOW, &|cell| !cell.finalized && cell.in_maze);
+    // Draw the walls for every non-finalized cell in the maze, for debugging purposes only
+    // draw_walls(YELLOWGREEN, &|cell| !cell.finalized && cell.in_maze);
 
     // Draw the maze walls
     draw_walls(BLACK, &|cell| cell.finalized);
@@ -305,20 +305,25 @@ fn view(app: &App, model: &Model, frame: Frame) {
 
     // Draw the player
     let player_position = grid_coords_to_nannou_position(model.player.grid_coordinates);
+    let player_radius = cell_w * 0.4 / 2.0;
     draw.ellipse()
         .x_y(player_position.0, player_position.1)
-        .radius(10.0)
-        // .no_fill()
+        .radius(player_radius)
+        .no_fill()
         .stroke(BLACK)
         .stroke_weight(1.0);
 
-    // Draw the exit, for debug purposes only
-    let exit_position = grid_coords_to_nannou_position(model.exit);
-    draw.ellipse()
-        .x_y(exit_position.0, exit_position.1)
-        .radius(10.0)
-        .stroke(GREEN)
-        .stroke_weight(1.0);
+    // Draw the exit if the player is 2 or less moves away from it
+    // TODO: Change this to line of sight?
+    if distance_between_coords(model.player.grid_coordinates, model.exit) <= 2 {
+        let exit_position = grid_coords_to_nannou_position(model.exit);
+        draw.ellipse()
+            .x_y(exit_position.0, exit_position.1)
+            .radius(player_radius)
+            .color(GREEN)
+            .stroke(GREEN)
+            .stroke_weight(1.0);
+    }
     // END - Draw entities in the maze
 
     // Write to the window frame.
@@ -393,4 +398,13 @@ fn directions_to_connect_to(mut neighbors: Vec<Neighbor>) -> Vec<Direction> {
     }
 
     return directions_to_connect_to;
+}
+
+fn distance_between_coords(coords_a: GridCoordinates, coords_b: GridCoordinates) -> usize {
+    let mut distance = 0;
+
+    distance += coords_a.x.abs_diff(coords_b.x);
+    distance += coords_a.y.abs_diff(coords_b.y);
+
+    distance
 }
