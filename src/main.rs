@@ -63,32 +63,47 @@ struct Grid {
 impl Grid {
     pub fn connect_neighbors(&mut self, cell_coords: GridCoordinates, directions: Vec<Direction>) {
         directions.into_iter().for_each(|direction| {
+            let cell = &mut self.cells[cell_coords.x][cell_coords.y];
+            let mut neighbor: &mut Cell;
+
             match direction {
                 Direction::Up => {
-                    self.cells[cell_coords.x][cell_coords.y].t_wall = false;
-                    self.cells[cell_coords.x as usize][(cell_coords.y + 1) as usize].b_wall = false;
-                    self.cells[cell_coords.x as usize][(cell_coords.y + 1) as usize].in_maze = true;
+                    cell.t_wall = false;
+
+                    // Remove the bottom wall of the cell above
+                    neighbor =
+                        &mut self.cells[cell_coords.x as usize][(cell_coords.y + 1) as usize];
+                    neighbor.b_wall = false;
                 }
                 Direction::Down => {
-                    self.cells[cell_coords.x][cell_coords.y].b_wall = false;
-                    self.cells[cell_coords.x as usize][(cell_coords.y - 1) as usize].t_wall = false;
-                    self.cells[cell_coords.x as usize][(cell_coords.y - 1) as usize].in_maze = true;
+                    cell.b_wall = false;
+
+                    // Remove the top wall of the cell below
+                    neighbor =
+                        &mut self.cells[cell_coords.x as usize][(cell_coords.y - 1) as usize];
+                    neighbor.t_wall = false;
                 }
                 Direction::Left => {
-                    self.cells[cell_coords.x][cell_coords.y].l_wall = false;
-                    self.cells[(cell_coords.x - 1) as usize][cell_coords.y as usize].r_wall = false;
-                    self.cells[(cell_coords.x - 1) as usize][cell_coords.y as usize].in_maze = true;
+                    cell.l_wall = false;
+
+                    // Remove the right wall of the cell to the left
+                    neighbor =
+                        &mut self.cells[(cell_coords.x - 1) as usize][cell_coords.y as usize];
+                    neighbor.r_wall = false;
                 }
                 Direction::Right => {
-                    self.cells[cell_coords.x][cell_coords.y].r_wall = false;
-                    self.cells[(cell_coords.x + 1) as usize][cell_coords.y as usize].l_wall = false;
-                    self.cells[(cell_coords.x + 1) as usize][cell_coords.y as usize].in_maze = true;
+                    cell.r_wall = false;
+
+                    // Remove the left wall of the cell to the right
+                    neighbor =
+                        &mut self.cells[(cell_coords.x + 1) as usize][cell_coords.y as usize];
+                    neighbor.l_wall = false;
                 }
             }
-            // neighbor_cell.in_maze = true;
+            neighbor.in_maze = true;
         });
 
-        let mut cell = &mut self.cells[cell_coords.x][cell_coords.y];
+        let cell = &mut self.cells[cell_coords.x][cell_coords.y];
         cell.in_maze = true;
         cell.finalized = true;
     }
