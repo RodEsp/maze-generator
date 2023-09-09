@@ -1,5 +1,5 @@
 # maze-generator
-A maze generator that creates a maze as a player moves through it. 
+A tiny game that creates a maze as a player moves through it. 
 
 It works by semi-randomly deciding which neighbors should be connected to the cell that the player moves to. In other words, as a player moves to a new tile in the maze, the generator fills in the walls of that tile. It ensures that there is always at least one way to exit the tile so that the player does not get stuck.
 
