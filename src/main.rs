@@ -34,9 +34,9 @@ struct Player {
     grid_coordinates: GridCoordinates,
 }
 
-struct CamelWarrior {
-    grid_coordinates: GridCoordinates,
-}
+// struct CamelWarrior {
+//     grid_coordinates: GridCoordinates,
+// }
 
 #[derive(Default, Clone, Debug, Copy)]
 struct Cell {
@@ -52,7 +52,7 @@ struct Cell {
 struct Model {
     grid: Grid,
     player: Player,
-    camel_warrior: CamelWarrior,
+    // camel_warrior: CamelWarrior,
     exit: GridCoordinates,
 }
 
@@ -138,10 +138,10 @@ fn init(app: &App) -> Model {
         x: rng.gen_range(0..NUM_OF_COLS),
         y: rng.gen_range(0..NUM_OF_ROWS),
     };
-    let cammel_warrior_coords = GridCoordinates {
-        x: rng.gen_range(0..NUM_OF_COLS),
-        y: rng.gen_range(0..NUM_OF_ROWS),
-    };
+    // let camel_warrior_coords = GridCoordinates {
+    //     x: rng.gen_range(0..NUM_OF_COLS),
+    //     y: rng.gen_range(0..NUM_OF_ROWS),
+    // };
 
     let mut model = Model {
         grid: Grid {
@@ -150,9 +150,9 @@ fn init(app: &App) -> Model {
         player: Player {
             grid_coordinates: player_coords,
         },
-        camel_warrior: CamelWarrior {
-            grid_coordinates: cammel_warrior_coords,
-        },
+        // camel_warrior: CamelWarrior {
+        //     grid_coordinates: camel_warrior_coords,
+        // },
         exit: GridCoordinates {
             x: rng.gen_range(0..NUM_OF_COLS),
             y: rng.gen_range(0..NUM_OF_ROWS),
